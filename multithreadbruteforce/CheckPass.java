@@ -4,21 +4,26 @@ import net.lingala.zip4j.ZipFile;
 import net.lingala.zip4j.exception.ZipException;
 import net.lingala.zip4j.model.FileHeader;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.InputStream;
 import java.util.concurrent.BlockingQueue;
 
-import static multithreadbruteforce.MultiThread.startTime;
-
 public class CheckPass extends Thread {
-    public final String zipPath = "files\\test.zip";
     private final BlockingQueue<String> passwordQueue;
     private final PasswordQueue passwordGenerator;
+    private final String zipPath;
+    public static volatile boolean passwordFound = false;
+    public static long endTime;
+//    private Main mainApp;
 
-    public CheckPass(BlockingQueue<String> passwordQueue, PasswordQueue passwordGenerator) {
+    public CheckPass(BlockingQueue<String> passwordQueue, PasswordQueue passwordGenerator, String zipPath) {
         this.passwordQueue = passwordQueue;
         this.passwordGenerator = passwordGenerator;
+        this.zipPath = zipPath;
     }
+
 
     @Override
     public void run() {
@@ -26,54 +31,52 @@ public class CheckPass extends Thread {
             ZipFile zipFile = new ZipFile(zipPath);
             FileHeader fileHeader = zipFile.getFileHeaders().getFirst();
 
-            while (true) {
+            while (!passwordFound && !Thread.currentThread().isInterrupted()) {
                 try {
                     String pass = passwordQueue.take();
+//                    MultiThread.updateStatus("Checking: " + pass);
 
                     synchronized (passwordGenerator) {
                         passwordGenerator.index++;
                     }
 
-//                    double startTime = System.nanoTime();
                     zipFile.setPassword(pass.toCharArray());
+                    //Thử đọc 1 byte từ file
                     try (InputStream inputStream = zipFile.getInputStream(fileHeader)) {
                         if (inputStream.read() != -1) {
-                            File extractedFile = new File("files\\extracted");
+                            zipFile.extractAll("files\\extracted");
+                            File extractedFile = new File("files\\extracted\\" + fileHeader.getFileName());
                             if (extractedFile.exists()) {
-                                System.out.println("Mật khẩu đúng là: " + pass);
-                                removeIndex();
-
-                                long endTime = System.currentTimeMillis();
-                                System.out.println("Thời gian thực hiện: " + (endTime - startTime) / 1000 + " giây");
-                                System.exit(0);
+                                endTime = System.currentTimeMillis();
+                                MultiThread.time += endTime - MultiThread.startTime;
+//                                mainApp.isRunning = false;
+                                passwordFound = true;
+                                resetIndex();
+                                MultiThread.updateStatus("Đã tìm thấy mật khẩu: " + pass + " trong " + MultiThread.time / 1000 + "s");
+                                return;
                             }
                         }
                     } catch (Exception e) {
                     }
 
-//                    double endTime = System.nanoTime();
-//                    System.out.println("Password: " + pass+" "+(endTime-startTime)+" ns");
-
                     if (passwordQueue.isEmpty()) {
                         passwordGenerator.resumeThread();
                     }
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
                 }
             }
         } catch (ZipException e) {
         }
     }
 
+    private static void resetIndex() {
 
-    void removeIndex() {
-        File indexFile = new File("files\\index.txt");
-        indexFile.delete();
-        File extracted = new File("files\\extracted");
-        File files[] = extracted.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                file.delete();
-            }
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("files\\index.txt"))) {
+            writer.write(0 + "");
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }
