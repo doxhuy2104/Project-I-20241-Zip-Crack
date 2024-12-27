@@ -9,15 +9,15 @@ public class MultiThread {
     public static double startTime;
     public static double time;
 
-    public static void startCracking(String zipFilePath, int numThreads, Main app, ThreadGroup threadGroup) {
+    public static void startCracking(String zipFilePath, int numThreads, Main app, ThreadGroup threadGroup, String charset, int maxPasswordLength) {
         mainApp = app;
         BlockingQueue<String> passwordQueue = new LinkedBlockingQueue<>(PasswordQueue.MAX_SIZE);
 
-        PasswordQueue passwordGenerator = new PasswordQueue();
+        PasswordQueue passwordGenerator = new PasswordQueue(charset.toCharArray(), maxPasswordLength);
         passwordGenerator.queue = passwordQueue;
-        if (mainApp.choiceBox.getValue() == "Thử từ đầu") {
+        if (mainApp.comboBox.getValue() == "Thử từ đầu") {
             passwordGenerator.index = 0;
-            mainApp.choiceBox.setValue("Tiếp tục từ lần thử trước");
+            mainApp.comboBox.setValue("Tiếp tục từ lần thử trước");
         } else {
             passwordGenerator.index = getIndex();
         }

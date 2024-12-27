@@ -34,7 +34,7 @@ public class CheckPass extends Thread {
             while (!passwordFound && !Thread.currentThread().isInterrupted()) {
                 try {
                     String pass = passwordQueue.take();
-//                    MultiThread.updateStatus("Checking: " + pass);
+                    MultiThread.updateStatus(Thread.currentThread().getName() + " Checking: " + pass);
 
                     synchronized (passwordGenerator) {
                         passwordGenerator.index++;
@@ -72,7 +72,6 @@ public class CheckPass extends Thread {
     }
 
     private static void resetIndex() {
-
         try (BufferedWriter writer = new BufferedWriter(new FileWriter("files\\index.txt"))) {
             writer.write(0 + "");
         } catch (Exception e) {
