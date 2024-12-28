@@ -16,7 +16,8 @@ public class CheckPass extends Thread {
     private final String zipPath;
     public static volatile boolean passwordFound = false;
     public static long endTime;
-//    private Main mainApp;
+
+    public static volatile boolean isRunning = true;
 
     public CheckPass(BlockingQueue<String> passwordQueue, PasswordQueue passwordGenerator, String zipPath) {
         this.passwordQueue = passwordQueue;
@@ -31,11 +32,18 @@ public class CheckPass extends Thread {
             ZipFile zipFile = new ZipFile(zipPath);
             FileHeader fileHeader = zipFile.getFileHeaders().getFirst();
 
-            while (!passwordFound && !Thread.currentThread().isInterrupted()) {
-                try {
-                    String pass = passwordQueue.take();
-                    MultiThread.updateStatus(Thread.currentThread().getName() + " Checking: " + pass);
 
+            while (!passwordFound) {
+                try {
+                    while (!isRunning) {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    String pass = passwordQueue.take();
+//                    MultiThread.updateStatus(Thread.currentThread().getName() + " Checking: " + pass);
                     synchronized (passwordGenerator) {
                         passwordGenerator.index++;
                     }
@@ -49,10 +57,10 @@ public class CheckPass extends Thread {
                             if (extractedFile.exists()) {
                                 endTime = System.currentTimeMillis();
                                 MultiThread.time += endTime - MultiThread.startTime;
-//                                mainApp.isRunning = false;
                                 passwordFound = true;
                                 resetIndex();
                                 MultiThread.updateStatus("Đã tìm thấy mật khẩu: " + pass + " trong " + MultiThread.time / 1000 + "s");
+                                Thread.currentThread().interrupt();
                                 return;
                             }
                         }
@@ -63,7 +71,6 @@ public class CheckPass extends Thread {
                         passwordGenerator.resumeThread();
                     }
                 } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
                     break;
                 }
             }
@@ -76,6 +83,10 @@ public class CheckPass extends Thread {
             writer.write(0 + "");
         } catch (Exception e) {
             e.printStackTrace();
+        }
+        File extractedFile = new File("files\\extracted");
+        if (extractedFile.exists()) {
+            extractedFile.delete();
         }
     }
 }

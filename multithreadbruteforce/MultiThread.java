@@ -1,15 +1,18 @@
 package multithreadbruteforce;
 
+import javafx.concurrent.Worker;
+
 import java.io.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class MultiThread {
+public class MultiThread extends Thread {
     private static Main mainApp;
     public static double startTime;
     public static double time;
 
-    public static void startCracking(String zipFilePath, int numThreads, Main app, ThreadGroup threadGroup, String charset, int maxPasswordLength) {
+    public static void startCracking(String zipFilePath, int numThreads, Main app, String charset, int maxPasswordLength) {
+        updateNumThreads(Thread.activeCount() + "");
         mainApp = app;
         BlockingQueue<String> passwordQueue = new LinkedBlockingQueue<>(PasswordQueue.MAX_SIZE);
 
@@ -27,7 +30,7 @@ public class MultiThread {
         startTime = System.currentTimeMillis();
         for (int i = 0; i < numThreads; i++) {
             CheckPass checkPass = new CheckPass(passwordQueue, passwordGenerator, zipFilePath);
-            Thread thread = new Thread(threadGroup, checkPass);
+            Thread thread = new Thread(checkPass);
             thread.start();
         }
     }
@@ -36,6 +39,12 @@ public class MultiThread {
     public static void updateStatus(String status) {
         if (mainApp != null) {
             mainApp.updateStatus(status);
+        }
+    }
+
+    private static void updateNumThreads(String numThreads) {
+        if (mainApp != null) {
+            mainApp.updateThreadStatus(numThreads);
         }
     }
 

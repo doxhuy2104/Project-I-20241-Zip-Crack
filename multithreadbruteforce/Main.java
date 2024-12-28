@@ -12,22 +12,25 @@ import javafx.stage.Stage;
 import java.io.*;
 
 public class Main extends Application {
+    private boolean started = false;
     private boolean canStart = false;
     public boolean isRunning = false;
+
     private TextField filePathField;
     private Spinner<Integer> threadSpinner, maxLenSpinner;
     private Label maxLenLabel;
-
     private Label statusLabel;
     private Button startButton, fileButton;
     public ComboBox<String> comboBox;
     public CheckBox lowerCase, upperCase, numbers, specialChars;
     private Label charsetLabel;
+    private ProgressBar progressBar;
+
     private ThreadGroup threadGroup;
 //    public double time=0;
 
     //debug
-    private Label threadLabel;
+    private Label numThreadLabel;
 
     @Override
     public void start(Stage primaryStage) {
@@ -38,7 +41,7 @@ public class Main extends Application {
         filePathField.setPrefWidth(300);
         fileButton = new Button("Chọn");
         fileButton.setOnAction(event -> selectFile(primaryStage));
-        getZipPath();
+
         HBox fileSection = new HBox(10, filePathField, fileButton);
 
         charsetLabel = new Label("Chọn bộ ký tự:");
@@ -71,6 +74,9 @@ public class Main extends Application {
         maxLenSpinner.setEditable(true);
         maxLenSpinner.setPrefWidth(70);
         HBox maxLenSection = new HBox(10, maxLenLabel, maxLenSpinner);
+
+        //Lấy dữ liệu từ file store.txt
+        getStore();
 
 
         comboBox = new ComboBox<>();
@@ -105,19 +111,26 @@ public class Main extends Application {
             }
 
             if (!isRunning) {
-                startCracking();
+                if (started)
+                    resumeCracking();
+                else
+                    startCracking();
                 startButton.setText("Tạm dừng");
             } else {
-                stopCracking();
+                pauseCracking();
                 startButton.setText("Tiếp tục");
             }
             isRunning = !isRunning;
         });
 
+        progressBar = new ProgressBar();
+        progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
+        progressBar.setVisible(false);
+
         statusLabel = new Label("");
+        numThreadLabel = new Label("");
 
-
-        VBox layout = new VBox(15, fileSection, threadSection, comboBox, maxLenSection, charsetLabelBox, charsetSection, startButton, statusLabel);
+        VBox layout = new VBox(15, fileSection, threadSection, comboBox, maxLenSection, charsetLabelBox, charsetSection, startButton, statusLabel, numThreadLabel, progressBar);
         layout.setStyle("-fx-padding: 20; -fx-alignment: center; -fx-spacing: 15;-fx-font-size: 16px;");
 
 
@@ -128,9 +141,9 @@ public class Main extends Application {
 
         //cập nhật index khi thoát
         primaryStage.setOnCloseRequest(event -> {
-            if (threadGroup != null) {
-                threadGroup.interrupt();
-            }
+//            if (threadGroup != null) {
+//                threadGroup.interrupt();
+//            }
             Platform.exit();
             if (isRunning) {
                 try (BufferedWriter writer = new BufferedWriter(new FileWriter("files\\index.txt"))) {
@@ -159,11 +172,17 @@ public class Main extends Application {
         }
     }
 
-    private void getZipPath() {
+    private void getStore() {
         try (BufferedReader reader = new BufferedReader(new FileReader("files\\store.txt"))) {
             String zipPath = reader.readLine();
             filePathField.setText(zipPath);
             if (!zipPath.isEmpty()) canStart = true;
+
+            int numThreads = Integer.parseInt(reader.readLine());
+            threadSpinner.getValueFactory().setValue(numThreads);
+
+            int maxPasswordLength = Integer.parseInt(reader.readLine());
+            maxLenSpinner.getValueFactory().setValue(maxPasswordLength);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -191,6 +210,7 @@ public class Main extends Application {
 
 
     private void startCracking() {
+        started = true;
         setControlsDisabled(true);
 
         String filePath = filePathField.getText();
@@ -232,30 +252,30 @@ public class Main extends Application {
             return;
         }
 
+        progressBar.setVisible(true);
 
-        threadGroup = new ThreadGroup("CrackingGroup");
-
-        MultiThread.startCracking(filePath, numThreads, this, threadGroup, charset, maxPasswordLength);
+        MultiThread.startCracking(filePath, numThreads, this, charset, maxPasswordLength);
     }
 
-    private void stopCracking() {
+    private void resumeCracking() {
+        setControlsDisabled(true);
+        CheckPass.isRunning = true;
+        PasswordQueue.isRunning = true;
+    }
 
-        if (threadGroup != null) {
-            threadGroup.interrupt();
-        }
-        double endTime = System.currentTimeMillis();
-        MultiThread.time += endTime - MultiThread.startTime;
+    private void pauseCracking() {
+        progressBar.setVisible(false);
+        CheckPass.isRunning = false;
+        PasswordQueue.isRunning = false;
 
         if (!CheckPass.passwordFound) {
             try (BufferedWriter writer = new BufferedWriter(new FileWriter("files\\index.txt"))) {
                 long currentIndex = MultiThread.getCurrentIndex();
                 writer.write(currentIndex + "");
-                statusLabel.setText("Đã tạm dừng tại index: " + currentIndex);
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
-        setControlsDisabled(false);
     }
 
 
@@ -266,6 +286,14 @@ public class Main extends Application {
                 isRunning = false;
                 startButton.setText("Bắt đầu");
             }
+        });
+
+    }
+
+    public void updateThreadStatus(String status) {
+        Platform.runLater(() -> {
+            numThreadLabel.setText(status);
+
         });
 
     }
