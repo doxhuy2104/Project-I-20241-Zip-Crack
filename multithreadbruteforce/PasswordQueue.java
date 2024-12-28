@@ -36,7 +36,7 @@ public class PasswordQueue extends Thread {
                     try {
                         lock.wait();
                     } catch (InterruptedException e) {
-                        e.printStackTrace();
+//                        e.printStackTrace();
                         return;
                     }
                 }
@@ -50,7 +50,7 @@ public class PasswordQueue extends Thread {
                     try {
                         lock.wait();
                     } catch (InterruptedException e) {
-                        e.printStackTrace();
+//                        e.printStackTrace();
                         return;
                     }
                 }

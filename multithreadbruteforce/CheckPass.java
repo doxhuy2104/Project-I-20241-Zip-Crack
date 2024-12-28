@@ -17,6 +17,7 @@ public class CheckPass extends Thread {
     public static volatile boolean passwordFound = false;
     public static long endTime;
 
+
     public static volatile boolean isRunning = true;
 
     public CheckPass(BlockingQueue<String> passwordQueue, PasswordQueue passwordGenerator, String zipPath) {
@@ -39,7 +40,7 @@ public class CheckPass extends Thread {
                         try {
                             Thread.sleep(1000);
                         } catch (InterruptedException e) {
-                            e.printStackTrace();
+//                            e.printStackTrace();
                         }
                     }
                     String pass = passwordQueue.take();
@@ -56,10 +57,16 @@ public class CheckPass extends Thread {
                             File extractedFile = new File("files\\extracted\\" + fileHeader.getFileName());
                             if (extractedFile.exists()) {
                                 endTime = System.currentTimeMillis();
-                                MultiThread.time += endTime - MultiThread.startTime;
+                                Main mainApp = Main.getMainApp();
+
+                                mainApp.time += endTime - mainApp.startTime;
                                 passwordFound = true;
                                 resetIndex();
-                                MultiThread.updateStatus("Đã tìm thấy mật khẩu: " + pass + " trong " + MultiThread.time / 1000 + "s");
+                                mainApp.updateStatus("Đã tìm thấy mật khẩu: " + pass + " trong " + mainApp.time / 1000 + "s");
+//                                mainApp.foundedPopup(pass, mainApp.time / 1000);
+                                mainApp.isRunning = false;
+                                mainApp.updateButton();
+                                mainApp.setControlsDisabled(false);
                                 Thread.currentThread().interrupt();
                                 return;
                             }
