@@ -12,56 +12,53 @@ public class PasswordQueue extends Thread {
     private int maxPasswordLength;
     public static boolean isRunning = true;
     private volatile long curIndex = 0; // Thêm biến instance
+    public long totalPasswords = 0;
 
     public PasswordQueue(char[] charset, int maxPasswordLength) {
         this.maxPasswordLength = maxPasswordLength;
         this.charset = charset;
+        this.totalPasswords = calculateTotalPassword();
     }
 
     @Override
     public void run() {
-        for (int length = 1; length <= maxPasswordLength; length++) {
-            generatePasswords(new char[length], 0, length);
+        try {
+            for (int length = 1; length <= maxPasswordLength && !Thread.currentThread().isInterrupted(); length++) {
+                generatePasswords(new char[length], 0, length);
+            }
+        } catch (Exception e) {
+            Thread.currentThread().interrupt();
         }
     }
 
     private void generatePasswords(char[] currentPassword, int position, int maxLength) {
-        if (!isRunning) {
+        if (!isRunning || Thread.currentThread().isInterrupted()) {
             return;
         }
 
         if (position == maxLength) {
             synchronized (lock) {
-                while (!isRunning) {
-                    try {
-                        lock.wait();
-                    } catch (InterruptedException e) {
-//                        e.printStackTrace();
-                        return;
-                    }
-                }
-
-                curIndex++;
-                if (curIndex <= index) {
-                    return;
-                }
-
-                while (pause) {
-                    try {
-                        lock.wait();
-                    } catch (InterruptedException e) {
-//                        e.printStackTrace();
-                        return;
-                    }
-                }
-
-                if (queue.size() >= MAX_SIZE) {
-                    pauseThread();
-                }
-
                 try {
+                    while (!isRunning && !Thread.currentThread().isInterrupted()) {
+                        lock.wait();
+                    }
+
+                    curIndex++;
+                    if (curIndex <= index) {
+                        return;
+                    }
+
+                    while (pause && !Thread.currentThread().isInterrupted()) {
+                        lock.wait();
+                    }
+
+                    if (queue.size() >= MAX_SIZE) {
+                        pauseThread();
+                    }
+
                     queue.put(new String(currentPassword));
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     return;
                 }
             }
@@ -69,9 +66,24 @@ public class PasswordQueue extends Thread {
         }
 
         for (char c : charset) {
+            if (Thread.currentThread().isInterrupted()) {
+                return;
+            }
             currentPassword[position] = c;
             generatePasswords(currentPassword, position + 1, maxLength);
         }
+    }
+
+    public long calculateTotalPassword() {
+        long total = 0;
+        for (int i = 1; i <= maxPasswordLength; i++) {
+            total += Math.pow(charset.length, i);
+        }
+        return total;
+    }
+
+    public double getProgress() {
+        return (double) curIndex / totalPasswords;
     }
 
     public static long getCurrentIndex() {

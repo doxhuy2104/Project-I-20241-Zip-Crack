@@ -34,19 +34,25 @@ public class CheckPass extends Thread {
             FileHeader fileHeader = zipFile.getFileHeaders().getFirst();
 
 
-            while (!passwordFound) {
+            while (!passwordFound && !Thread.currentThread().isInterrupted()) {
                 try {
-                    while (!isRunning) {
+                    while (!isRunning && !Thread.currentThread().isInterrupted()) {
                         try {
                             Thread.sleep(1000);
                         } catch (InterruptedException e) {
-//                            e.printStackTrace();
+                            Thread.currentThread().interrupt();
+                            return;
                         }
                     }
+
                     String pass = passwordQueue.take();
 //                    MultiThread.updateStatus(Thread.currentThread().getName() + " Checking: " + pass);
                     synchronized (passwordGenerator) {
                         passwordGenerator.index++;
+                        if (passwordGenerator.index % 100 == 0) {
+                            double progress = (double) passwordGenerator.index / passwordGenerator.totalPasswords;
+                            Main.getMainApp().updateProgress(progress);
+                        }
                     }
 
                     zipFile.setPassword(pass.toCharArray());
@@ -64,10 +70,12 @@ public class CheckPass extends Thread {
                                 resetIndex();
                                 mainApp.updateStatus("Đã tìm thấy mật khẩu: " + pass + " trong " + mainApp.time / 1000 + "s");
 //                                mainApp.foundedPopup(pass, mainApp.time / 1000);
+                                mainApp.time = 0;
                                 mainApp.isRunning = false;
                                 mainApp.updateButton();
                                 mainApp.setControlsDisabled(false);
-                                Thread.currentThread().interrupt();
+                                mainApp.updateProgress(1);
+                                mainApp.stopAllThreads();
                                 return;
                             }
                         }
@@ -78,6 +86,7 @@ public class CheckPass extends Thread {
                         passwordGenerator.resumeThread();
                     }
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     break;
                 }
             }

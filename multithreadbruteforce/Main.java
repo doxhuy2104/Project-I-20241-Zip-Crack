@@ -5,6 +5,9 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -27,13 +30,15 @@ public class Main extends Application {
     public Button startButton, fileButton;
     public ComboBox<String> comboBox;
     public CheckBox lowerCase, upperCase, numbers, specialChars;
-    private ProgressBar progressBar;
+    public ProgressBar progressBar;
 
 
     private static Main mainApp;
 
     private Thread passwordGeneratorThread;
     private Thread[] checkPassThreads;
+
+    private boolean changeNumThreads = false;
 
     //debug
     private Label numThreadLabel;
@@ -46,7 +51,7 @@ public class Main extends Application {
         filePathField = new TextField();
         filePathField.setPromptText("Chọn tệp zip");
         filePathField.setPrefWidth(300);
-        fileButton = new Button("Chọn");
+        fileButton = new Button("Chọn tệp");
         fileButton.setOnAction(_ -> selectFile(primaryStage));
 
         HBox fileSection = new HBox(10, filePathField, fileButton);
@@ -76,8 +81,13 @@ public class Main extends Application {
 
         HBox threadSection = new HBox(10, threadLabel, threadSpinner);
 
-        threadSpinner.valueProperty().addListener((observable, oldValue, newValue) -> {
 
+        threadSpinner.valueProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue.equals(oldValue)) {
+//                storeData();
+                stopAllThreads();
+                changeNumThreads = true;
+            }
         });
 
 
@@ -88,7 +98,7 @@ public class Main extends Application {
         HBox maxLenSection = new HBox(10, maxLenLabel, maxLenSpinner);
 
         //Lấy dữ liệu từ file store.txt
-        getStore();
+        getData();
 
 
         comboBox = new ComboBox<>();
@@ -98,6 +108,7 @@ public class Main extends Application {
             setCharsetAndMaxLenDisabled(true);
         } else {
             comboBox.setValue("Thử từ đầu");
+            comboBox.setDisable(true);
         }
         comboBox.setOnAction(_ -> {
             if (comboBox.getValue().equals("Tiếp tục từ lần thử trước")) {
@@ -123,28 +134,56 @@ public class Main extends Application {
             }
 
             if (!isRunning) {
-                if (started)
-                    resumeCracking();
-                else
+                if (started) {
+                    System.out.println(changeNumThreads);
+                    if (!changeNumThreads)
+                        resumeCracking();
+                    else {
+                        startCracking();
+                        changeNumThreads = false;
+                    }
+                    updateNumThreads(Thread.activeCount() + "");
+                } else {
+                    updateNumThreads(Thread.activeCount() + "");
                     startCracking();
+                    time = 0;
+                }
+                storeData();
                 startButton.setText("Tạm dừng");
             } else {
+                setFileCountinueDisabled(false);
                 pauseCracking();
                 startButton.setText("Tiếp tục");
             }
             isRunning = !isRunning;
         });
+        filePathField.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue.equals(oldValue)) {
+                CheckPass.passwordFound = false;
+                updateProgress(0);
+                statusLabel.setText("");
+                stopAllThreads();
+                started = false;
+                isRunning = false;
+                comboBox.setValue("Thử từ đầu");
+                startButton.setText("Bắt đầu");
+                setControlsDisabled(false);
+            }
+        });
 
-        progressBar = new ProgressBar();
 
         statusLabel = new Label("");
         numThreadLabel = new Label("");
 
-        VBox layout = new VBox(15, fileSection, comboBox, threadSection, maxLenSection, charsetLabelBox, charsetSection, startButton, statusLabel, numThreadLabel, progressBar);
+        progressBar = new ProgressBar(0);
+        progressBar.setPrefWidth(300);
+        progressBar.setStyle("-fx-accent: #00FF00;");
+
+        VBox layout = new VBox(15, fileSection, comboBox, threadSection, maxLenSection, charsetLabelBox, charsetSection, startButton, progressBar, statusLabel, numThreadLabel);
         layout.setStyle("-fx-padding: 20; -fx-alignment: center; -fx-spacing: 15;-fx-font-size: 16px;");
 
 
-        Scene scene = new Scene(layout, 410, 500);
+        Scene scene = new Scene(layout, 450, 600);
         primaryStage.setScene(scene);
         primaryStage.show();
         primaryStage.setResizable(false);
@@ -221,6 +260,8 @@ public class Main extends Application {
     }
 
     private void startCracking() {
+        CheckPass.passwordFound = false;
+        updateNumThreads(Thread.activeCount() + "");
         started = true;
         setControlsDisabled(true);
 
@@ -263,7 +304,6 @@ public class Main extends Application {
             return;
         }
 
-        progressBar.setVisible(true);
 
         startCracking(filePath, numThreads, charset, maxPasswordLength);
     }
@@ -276,8 +316,10 @@ public class Main extends Application {
     }
 
     private void pauseCracking() {
+        Platform.runLater(() -> {
+            threadSpinner.setDisable(false);
+        });
         time += System.currentTimeMillis() - startTime;
-        progressBar.setVisible(false);
         CheckPass.isRunning = false;
         PasswordQueue.isRunning = false;
 
@@ -300,6 +342,10 @@ public class Main extends Application {
         });
     }
 
+    public void updateProgress(double progress) {
+        Platform.runLater(() -> progressBar.setProgress(progress));
+    }
+
     private void selectFile(Stage stage) {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Chọn tệp zip");
@@ -307,12 +353,20 @@ public class Main extends Application {
         File selectedFile = fileChooser.showOpenDialog(stage);
         if (selectedFile != null) {
             filePathField.setText(selectedFile.getAbsolutePath());
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter("files\\store.txt"))) {
-                writer.write(selectedFile.getAbsolutePath());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            storeData();
             canStart = true;
+        }
+    }
+
+    //lưu trữ path, số luồng, độ dài mật khẩu
+    public void storeData() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("files\\store.txt"))) {
+            writer.write(filePathField.getText() + "\n");
+            writer.write(threadSpinner.getValue() + "\n");
+            writer.write(maxLenSpinner.getValue() + "\n");
+            writer.write(time + "\n");
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -338,7 +392,7 @@ public class Main extends Application {
         return PasswordQueue.getCurrentIndex();
     }
 
-    private void getStore() {
+    private void getData() {
         try (BufferedReader reader = new BufferedReader(new FileReader("files\\store.txt"))) {
             String zipPath = reader.readLine();
             filePathField.setText(zipPath);
@@ -349,6 +403,8 @@ public class Main extends Application {
 
             int maxPasswordLength = Integer.parseInt(reader.readLine());
             maxLenSpinner.getValueFactory().setValue(maxPasswordLength);
+
+            time = Double.parseDouble(reader.readLine());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -376,6 +432,14 @@ public class Main extends Application {
         return mainApp;
     }
 
+    public void setFileCountinueDisabled(boolean disabled) {
+        Platform.runLater(() -> {
+            fileButton.setDisable(disabled);
+            filePathField.setDisable(disabled);
+            comboBox.setDisable(disabled);
+        });
+    }
+
     public void setControlsDisabled(boolean disabled) {
         Platform.runLater(() -> {
             fileButton.setDisable(disabled);
@@ -397,6 +461,21 @@ public class Main extends Application {
         specialChars.setDisable(disabled);
         maxLenSpinner.setDisable(disabled);
     }
+
+    private long calculateTotalPassword() {
+        int charsetLen = 0;
+        if (lowerCase.isSelected()) charsetLen += 26;
+        if (upperCase.isSelected()) charsetLen += 26;
+        if (numbers.isSelected()) charsetLen += 10;
+        if (specialChars.isSelected()) charsetLen += 24;
+
+        long total = 0;
+        for (int i = 1; i <= maxLenSpinner.getValue(); i++) {
+            total += Math.pow(charsetLen, i);
+        }
+        return total;
+    }
+
 
     public static void main(String[] args) {
         launch(args);
