@@ -179,6 +179,7 @@ public class Main extends Application {
         progressBar.setPrefWidth(300);
         progressBar.setStyle("-fx-accent: #00FF00;");
 
+
         VBox layout = new VBox(15, fileSection, comboBox, threadSection, maxLenSection, charsetLabelBox, charsetSection, startButton, progressBar, statusLabel, numThreadLabel);
         layout.setStyle("-fx-padding: 20; -fx-alignment: center; -fx-spacing: 15;-fx-font-size: 16px;");
 
@@ -260,6 +261,8 @@ public class Main extends Application {
     }
 
     private void startCracking() {
+        // Thêm vào đầu phương thức start
+        CPUAffinity.setCPUAffinity(0, 1, 2, 3);
         CheckPass.passwordFound = false;
         updateNumThreads(Thread.activeCount() + "");
         started = true;
