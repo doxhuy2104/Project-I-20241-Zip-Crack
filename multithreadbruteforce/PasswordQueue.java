@@ -13,6 +13,7 @@ public class PasswordQueue extends Thread {
     public static boolean isRunning = true;
     private volatile long curIndex = 0; // Thêm biến instance
     public long totalPasswords = 0;
+    public boolean isFinished = false;
 
     public PasswordQueue(char[] charset, int maxPasswordLength) {
         this.maxPasswordLength = maxPasswordLength;
@@ -26,6 +27,7 @@ public class PasswordQueue extends Thread {
             for (int length = 1; length <= maxPasswordLength && !Thread.currentThread().isInterrupted(); length++) {
                 generatePasswords(new char[length], 0, length);
             }
+            isFinished = true;
         } catch (Exception e) {
             Thread.currentThread().interrupt();
         }

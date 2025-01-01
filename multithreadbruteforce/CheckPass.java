@@ -45,13 +45,33 @@ public class CheckPass extends Thread {
                         }
                     }
 
+                    if (passwordGenerator.isFinished && passwordQueue.isEmpty()) {
+                        isRunning = false;
+                        Main mainApp = Main.getMainApp();
+                        resetIndex();
+                        synchronized (passwordGenerator) {
+                            passwordGenerator.index = 0;
+                        }
+                        mainApp.time += System.currentTimeMillis() - mainApp.startTime;
+                        mainApp.updateButton();
+                        mainApp.updateStatus("Không tìm thấy mật khẩu");
+                        mainApp.updateTimeLabel("Thời gian thực hiện: " + mainApp.time / 1000 + "s");
+                        mainApp.updateProgress(1);
+                        mainApp.stopAllThreads();
+                        mainApp.setControlsDisabled(false);
+                        mainApp.disableComboBox(true);
+                        mainApp.started = false;
+                        mainApp.time = 0;
+                        return;
+                    }
                     String pass = passwordQueue.take();
-//                    MultiThread.updateStatus(Thread.currentThread().getName() + " Checking: " + pass);
                     synchronized (passwordGenerator) {
+
                         passwordGenerator.index++;
                         if (passwordGenerator.index % 100 == 0) {
                             double progress = (double) passwordGenerator.index / passwordGenerator.totalPasswords;
                             Main.getMainApp().updateProgress(progress);
+//                            Main.getMainApp().updateStatus("Đang kiểm tra mật khẩu: " + pass);
                         }
                     }
 
@@ -68,7 +88,8 @@ public class CheckPass extends Thread {
                                 mainApp.time += endTime - mainApp.startTime;
                                 passwordFound = true;
                                 resetIndex();
-                                mainApp.updateStatus("Đã tìm thấy mật khẩu: " + pass + " trong " + mainApp.time / 1000 + "s");
+                                mainApp.updateStatus("Đã tìm thấy mật khẩu: " + pass);
+                                mainApp.updateTimeLabel("Trong thời gian: " + mainApp.time / 1000 + "s");
 //                                mainApp.foundedPopup(pass, mainApp.time / 1000);
                                 mainApp.time = 0;
                                 mainApp.isRunning = false;
@@ -76,6 +97,8 @@ public class CheckPass extends Thread {
                                 mainApp.setControlsDisabled(false);
                                 mainApp.updateProgress(1);
                                 mainApp.stopAllThreads();
+                                mainApp.disableComboBox(true);
+                                mainApp.started = false;
                                 return;
                             }
                         }

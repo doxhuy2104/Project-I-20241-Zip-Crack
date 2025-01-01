@@ -17,7 +17,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class Main extends Application {
-    private boolean started = false;
+    public boolean started = false;
     private boolean canStart = false;
     public boolean isRunning = false;
 
@@ -31,7 +31,7 @@ public class Main extends Application {
     public ComboBox<String> comboBox;
     public CheckBox lowerCase, upperCase, numbers, specialChars;
     public ProgressBar progressBar;
-
+    public Label timeLabel;
 
     private static Main mainApp;
 
@@ -83,7 +83,7 @@ public class Main extends Application {
 
 
         threadSpinner.valueProperty().addListener((observable, oldValue, newValue) -> {
-            if (!newValue.equals(oldValue)) {
+            if (!newValue.equals(oldValue) && started) {
 //                storeData();
                 stopAllThreads();
                 changeNumThreads = true;
@@ -115,6 +115,9 @@ public class Main extends Application {
                 setCharsetAndMaxLenDisabled(true);
                 startButton.setText("Tiếp tục");
             } else {
+                started = false;
+//                resetIndex();
+                updateProgress(0);
                 setCharsetAndMaxLenDisabled(false);
                 startButton.setText("Bắt đầu");
             }
@@ -135,10 +138,11 @@ public class Main extends Application {
 
             if (!isRunning) {
                 if (started) {
-                    System.out.println(changeNumThreads);
                     if (!changeNumThreads)
                         resumeCracking();
                     else {
+                        CheckPass.isRunning = true;
+                        PasswordQueue.isRunning = true;
                         startCracking();
                         changeNumThreads = false;
                     }
@@ -175,12 +179,13 @@ public class Main extends Application {
         statusLabel = new Label("");
         numThreadLabel = new Label("");
 
-        progressBar = new ProgressBar(0);
+        progressBar = new ProgressBar((double) getIndex() / calculateTotalPassword());
         progressBar.setPrefWidth(300);
         progressBar.setStyle("-fx-accent: #00FF00;");
 
+        timeLabel = new Label("");
 
-        VBox layout = new VBox(15, fileSection, comboBox, threadSection, maxLenSection, charsetLabelBox, charsetSection, startButton, progressBar, statusLabel, numThreadLabel);
+        VBox layout = new VBox(15, fileSection, comboBox, threadSection, maxLenSection, charsetLabelBox, charsetSection, startButton, progressBar, statusLabel, timeLabel, numThreadLabel);
         layout.setStyle("-fx-padding: 20; -fx-alignment: center; -fx-spacing: 15;-fx-font-size: 16px;");
 
 
@@ -194,6 +199,9 @@ public class Main extends Application {
 //            if (threadGroup != null) {
 //                threadGroup.interrupt();
 //            }
+            storeData();
+            stopAllThreads();
+
             Platform.exit();
             if (isRunning) {
                 try (BufferedWriter writer = new BufferedWriter(new FileWriter("files\\index.txt"))) {
@@ -261,8 +269,7 @@ public class Main extends Application {
     }
 
     private void startCracking() {
-        // Thêm vào đầu phương thức start
-        CPUAffinity.setCPUAffinity(0, 1, 2, 3);
+//        CPUAffinity.setCPUAffinity(0, 1, 2, 3);
         CheckPass.passwordFound = false;
         updateNumThreads(Thread.activeCount() + "");
         started = true;
@@ -367,7 +374,8 @@ public class Main extends Application {
             writer.write(filePathField.getText() + "\n");
             writer.write(threadSpinner.getValue() + "\n");
             writer.write(maxLenSpinner.getValue() + "\n");
-            writer.write(time + "\n");
+            writer.write((lowerCase.isSelected() ? "1" : "0") + (upperCase.isSelected() ? "1" : "0") + (numbers.isSelected() ? "1" : "0") + (specialChars.isSelected() ? "1" : "0") + "\n");
+//            writer.write(time + "\n");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -407,7 +415,14 @@ public class Main extends Application {
             int maxPasswordLength = Integer.parseInt(reader.readLine());
             maxLenSpinner.getValueFactory().setValue(maxPasswordLength);
 
-            time = Double.parseDouble(reader.readLine());
+            String charset = reader.readLine();
+            char[] charsetArray = charset.toCharArray();
+
+            lowerCase.setSelected(charsetArray[0] == '1');
+            upperCase.setSelected(charsetArray[1] == '1');
+            numbers.setSelected(charsetArray[2] == '1');
+            specialChars.setSelected(charsetArray[3] == '1');
+//            time = Double.parseDouble(reader.readLine());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -466,19 +481,59 @@ public class Main extends Application {
     }
 
     private long calculateTotalPassword() {
-        int charsetLen = 0;
-        if (lowerCase.isSelected()) charsetLen += 26;
-        if (upperCase.isSelected()) charsetLen += 26;
-        if (numbers.isSelected()) charsetLen += 10;
-        if (specialChars.isSelected()) charsetLen += 24;
+        long totalPasswords = 0;
+        try (BufferedReader reader = new BufferedReader(new FileReader("files\\store.txt"))) {
+            reader.readLine();
+            reader.readLine();
+            int maxPasswordLength = Integer.parseInt(reader.readLine());
+            String charset = reader.readLine();
+            char[] charsetArray = charset.toCharArray();
+            StringBuilder charsetBuilder = new StringBuilder();
+            if (charsetArray[0] == '1') {
+                charsetBuilder.append("abcdefghijklmnopqrstuvwxyz");
+            }
+            if (charsetArray[1] == '1') {
+                charsetBuilder.append("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+            }
+            if (charsetArray[2] == '1') {
+                charsetBuilder.append("0123456789");
+            }
+            if (charsetArray[3] == '1') {
+                charsetBuilder.append("!@#$%^&*()_+[]{}|;:,.<>?");
+            }
 
-        long total = 0;
-        for (int i = 1; i <= maxLenSpinner.getValue(); i++) {
-            total += Math.pow(charsetLen, i);
+
+            for (int i = 1; i <= maxPasswordLength; i++) {
+                totalPasswords += Math.pow(charsetBuilder.length(), i);
+
+            }
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        return total;
+        return totalPasswords;
     }
 
+    public void disableComboBox(boolean disabled) {
+        Platform.runLater(() -> {
+            comboBox.setDisable(disabled);
+        });
+    }
+
+    private void resetIndex() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("files\\index.txt"))) {
+            writer.write("0");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void updateTimeLabel(String s) {
+        Platform.runLater(() -> {
+            timeLabel.setText(s);
+        });
+    }
 
     public static void main(String[] args) {
         launch(args);
