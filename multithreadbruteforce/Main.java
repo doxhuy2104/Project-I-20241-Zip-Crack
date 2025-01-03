@@ -11,6 +11,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.scene.image.Image;
 
 import java.io.*;
 import java.util.concurrent.BlockingQueue;
@@ -47,7 +48,9 @@ public class Main extends Application {
     public void start(Stage primaryStage) {
         mainApp = this;
         primaryStage.setTitle("Bẻ khoá file zip");
+        Image icon = new Image("files//unlock.png");
 
+        primaryStage.getIcons().add(icon);
         filePathField = new TextField();
         filePathField.setPromptText("Chọn tệp zip");
         filePathField.setPrefWidth(300);
@@ -118,8 +121,18 @@ public class Main extends Application {
                 started = false;
 //                resetIndex();
                 updateProgress(0);
+                stopAllThreads();
                 setCharsetAndMaxLenDisabled(false);
                 startButton.setText("Bắt đầu");
+//                startButton.setDisable(true);
+//                new Thread(() -> {
+//                    try {
+//                        Thread.sleep(1000);
+//                        Platform.runLater(() -> startButton.setDisable(false));
+//                    } catch (InterruptedException e) {
+//                        e.printStackTrace();
+//                    }
+//                }).start();
             }
         });
 
@@ -152,7 +165,7 @@ public class Main extends Application {
                     startCracking();
                     time = 0;
                 }
-                storeData();
+//                storeData();
                 startButton.setText("Tạm dừng");
             } else {
                 setFileCountinueDisabled(false);
@@ -172,6 +185,8 @@ public class Main extends Application {
                 comboBox.setValue("Thử từ đầu");
                 startButton.setText("Bắt đầu");
                 setControlsDisabled(false);
+                statusLabel.setText("");
+                timeLabel.setText("");
             }
         });
 
@@ -271,8 +286,12 @@ public class Main extends Application {
     private void startCracking() {
 //        CPUAffinity.setCPUAffinity(0, 1, 2, 3);
         CheckPass.passwordFound = false;
+        CheckPass.isRunning = true;
+        PasswordQueue.isRunning = true;
         updateNumThreads(Thread.activeCount() + "");
         started = true;
+        statusLabel.setText("");
+        timeLabel.setText("");
         setControlsDisabled(true);
 
         String filePath = filePathField.getText();
@@ -329,7 +348,12 @@ public class Main extends Application {
         Platform.runLater(() -> {
             threadSpinner.setDisable(false);
         });
+
         time += System.currentTimeMillis() - startTime;
+        storeData();
+
+        System.out.print(time);
+        expectedTime();
         CheckPass.isRunning = false;
         PasswordQueue.isRunning = false;
 
@@ -375,7 +399,7 @@ public class Main extends Application {
             writer.write(threadSpinner.getValue() + "\n");
             writer.write(maxLenSpinner.getValue() + "\n");
             writer.write((lowerCase.isSelected() ? "1" : "0") + (upperCase.isSelected() ? "1" : "0") + (numbers.isSelected() ? "1" : "0") + (specialChars.isSelected() ? "1" : "0") + "\n");
-//            writer.write(time + "\n");
+            writer.write(time + "\n");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -422,7 +446,8 @@ public class Main extends Application {
             upperCase.setSelected(charsetArray[1] == '1');
             numbers.setSelected(charsetArray[2] == '1');
             specialChars.setSelected(charsetArray[3] == '1');
-//            time = Double.parseDouble(reader.readLine());
+            time = Double.parseDouble(reader.readLine());
+            System.out.println(time);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -528,6 +553,18 @@ public class Main extends Application {
             e.printStackTrace();
         }
     }
+
+    public void expectedTime() {
+        double totalPasswords = calculateTotalPassword();
+        double expTime = time * totalPasswords / PasswordQueue.index;
+        int hours = (int) (expTime / 3600000);
+        int minutes = (int) (expTime % 3600000 / 60000);
+        int seconds = (int) (expTime % 60000 / 1000);
+        Platform.runLater(() -> {
+            statusLabel.setText("Dự kiến: " + hours + "h " + minutes + "m " + seconds + "s");
+        });
+    }
+
 
     public void updateTimeLabel(String s) {
         Platform.runLater(() -> {

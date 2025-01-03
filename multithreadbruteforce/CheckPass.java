@@ -43,6 +43,9 @@ public class CheckPass extends Thread {
                             Thread.currentThread().interrupt();
                             return;
                         }
+//                        synchronized (this) {
+//                            wait();
+//                        }
                     }
 
                     if (passwordGenerator.isFinished && passwordQueue.isEmpty()) {
@@ -57,11 +60,11 @@ public class CheckPass extends Thread {
                         mainApp.updateStatus("Không tìm thấy mật khẩu");
                         mainApp.updateTimeLabel("Thời gian thực hiện: " + mainApp.time / 1000 + "s");
                         mainApp.updateProgress(1);
-                        mainApp.stopAllThreads();
                         mainApp.setControlsDisabled(false);
                         mainApp.disableComboBox(true);
                         mainApp.started = false;
                         mainApp.time = 0;
+                        mainApp.stopAllThreads();
                         return;
                     }
                     String pass = passwordQueue.take();
@@ -96,9 +99,9 @@ public class CheckPass extends Thread {
                                 mainApp.updateButton();
                                 mainApp.setControlsDisabled(false);
                                 mainApp.updateProgress(1);
-                                mainApp.stopAllThreads();
                                 mainApp.disableComboBox(true);
                                 mainApp.started = false;
+                                mainApp.stopAllThreads();
                                 return;
                             }
                         }
