@@ -1,5 +1,7 @@
 package multithreadbruteforce;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.util.concurrent.BlockingQueue;
 
 public class PasswordQueue extends Thread {
@@ -14,18 +16,24 @@ public class PasswordQueue extends Thread {
     private volatile long curIndex = 0; // Thêm biến instance
     public long totalPasswords = 0;
     public boolean isFinished = false;
+    public String tryMethod;
 
-    public PasswordQueue(char[] charset, int maxPasswordLength) {
+    public PasswordQueue(char[] charset, int maxPasswordLength, String tryMethod) {
         this.maxPasswordLength = maxPasswordLength;
         this.charset = charset;
-        this.totalPasswords = calculateTotalPassword();
+        this.tryMethod = tryMethod;
+        this.totalPasswords = tryMethod == "Brute Force" ? calculateTotalPassword() : getTotalDictionaryPasswords();
     }
 
     @Override
     public void run() {
         try {
-            for (int length = 1; length <= maxPasswordLength && !Thread.currentThread().isInterrupted(); length++) {
-                generatePasswords(new char[length], 0, length);
+            if (tryMethod.equals("Brute Force")) {
+                for (int length = 1; length <= maxPasswordLength && !Thread.currentThread().isInterrupted(); length++) {
+                    generatePasswords(new char[length], 0, length);
+                }
+            } else {
+                dictionaryPasswords();
             }
             isFinished = true;
         } catch (Exception e) {
@@ -76,16 +84,62 @@ public class PasswordQueue extends Thread {
         }
     }
 
+    private void dictionaryPasswords() {
+        try (BufferedReader reader = new BufferedReader(new FileReader("files\\dictionary.txt"))) {
+            String password;
+            while ((password = reader.readLine()) != null) {
+                synchronized (lock) {
+                    try {
+                        while (!isRunning) {
+                            lock.wait();
+                        }
+
+                        curIndex++;
+                        if (curIndex <= index) {
+                            continue;
+                        }
+
+                        while (pause) {
+                            lock.wait();
+                        }
+
+                        if (queue.size() >= MAX_SIZE) {
+                            pauseThread();
+                        }
+
+                        queue.put(password);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public long getTotalDictionaryPasswords() {
+        long total = 0;
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader("files\\dictionary.txt"));
+            String password;
+            while ((password = reader.readLine()) != null) {
+                total++;
+            }
+            reader.close();
+
+        } catch (Exception e) {
+            Thread.currentThread().interrupt();
+        }
+        return total;
+    }
+
     public long calculateTotalPassword() {
         long total = 0;
         for (int i = 1; i <= maxPasswordLength; i++) {
             total += Math.pow(charset.length, i);
         }
         return total;
-    }
-
-    public double getProgress() {
-        return (double) curIndex / totalPasswords;
     }
 
     public static long getCurrentIndex() {

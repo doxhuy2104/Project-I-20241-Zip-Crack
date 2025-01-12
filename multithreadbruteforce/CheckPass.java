@@ -85,6 +85,7 @@ public class CheckPass extends Thread {
                             zipFile.extractAll("files\\extracted");
                             File extractedFile = new File("files\\extracted\\" + fileHeader.getFileName());
                             if (extractedFile.exists()) {
+                                cleanupExtracted();
                                 endTime = System.currentTimeMillis();
                                 Main mainApp = Main.getMainApp();
 
@@ -120,15 +121,32 @@ public class CheckPass extends Thread {
         }
     }
 
+    private void cleanupExtracted() {
+        File extractedFile = new File("files\\extracted");
+        if (extractedFile.exists()) {
+            deleteDirectory(extractedFile);
+        }
+    }
+
+    private void deleteDirectory(File directory) {
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) {
+                    deleteDirectory(file);
+                } else {
+                    file.delete();
+                }
+            }
+        }
+        directory.delete();
+    }
+
     private static void resetIndex() {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter("files\\index.txt"))) {
             writer.write(0 + "");
         } catch (Exception e) {
             e.printStackTrace();
-        }
-        File extractedFile = new File("files\\extracted");
-        if (extractedFile.exists()) {
-            extractedFile.delete();
         }
     }
 }

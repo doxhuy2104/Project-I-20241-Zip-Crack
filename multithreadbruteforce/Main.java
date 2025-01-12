@@ -22,6 +22,7 @@ public class Main extends Application {
     private boolean canStart = false;
     public boolean isRunning = false;
 
+
     public double startTime;
     public double time = 0;
 
@@ -29,7 +30,7 @@ public class Main extends Application {
     private Spinner<Integer> threadSpinner, maxLenSpinner;
     private Label statusLabel;
     public Button startButton, fileButton;
-    public ComboBox<String> comboBox;
+    public ComboBox<String> comboBox, tryMethodSelection;
     public CheckBox lowerCase, upperCase, numbers, specialChars;
     public ProgressBar progressBar;
     public Label timeLabel;
@@ -40,6 +41,8 @@ public class Main extends Application {
     private Thread[] checkPassThreads;
 
     private boolean changeNumThreads = false;
+    public String tryMethod = "Brute Force";
+
 
     //debug
     private Label numThreadLabel;
@@ -56,6 +59,10 @@ public class Main extends Application {
         filePathField.setPrefWidth(300);
         fileButton = new Button("Chọn tệp");
         fileButton.setOnAction(_ -> selectFile(primaryStage));
+
+        Label tryMethodLabel = new Label("Chọn phương pháp thử mật khẩu:");
+        VBox tryMethodLabelBox = new VBox(10, tryMethodLabel);
+
 
         HBox fileSection = new HBox(10, filePathField, fileButton);
 
@@ -103,6 +110,28 @@ public class Main extends Application {
         //Lấy dữ liệu từ file store.txt
         getData();
 
+        tryMethodSelection = new ComboBox<>();
+        tryMethodSelection.setItems(FXCollections.observableArrayList("Brute Force Attack", "Dictionary Attack"));
+        tryMethodSelection.setValue("Brute Force Attack");
+        tryMethodSelection.setOnAction(_ -> {
+            if (tryMethodSelection.getValue().equals("Dictionary Attack")) {
+                tryMethod = "Dictionary";
+                started = false;
+//                resetIndex();
+                updateProgress(0);
+                stopAllThreads();
+                setCharsetAndMaxLenDisabled(false);
+                startButton.setText("Bắt đầu");
+            } else {
+                tryMethod = "Brute Force";
+                started = false;
+//                resetIndex();
+                updateProgress(0);
+                stopAllThreads();
+                setCharsetAndMaxLenDisabled(false);
+                startButton.setText("Bắt đầu");
+            }
+        });
 
         comboBox = new ComboBox<>();
         comboBox.setItems(FXCollections.observableArrayList("Thử từ đầu", "Tiếp tục từ lần thử trước"));
@@ -199,12 +228,17 @@ public class Main extends Application {
         progressBar.setStyle("-fx-accent: #00FF00;");
 
         timeLabel = new Label("");
+        Separator separator1 = new Separator();
+        Separator separator2 = new Separator();
+        Separator separator3 = new Separator();
+        Separator separator4 = new Separator();
+        Separator separator5 = new Separator();
 
-        VBox layout = new VBox(15, fileSection, comboBox, threadSection, maxLenSection, charsetLabelBox, charsetSection, startButton, progressBar, statusLabel, timeLabel, numThreadLabel);
+
+        VBox layout = new VBox(15, fileSection, separator1, tryMethodLabelBox, tryMethodSelection, separator2, threadSection, separator3, maxLenSection, charsetLabelBox, charsetSection, separator4, startButton, separator5, progressBar, statusLabel, timeLabel, numThreadLabel);
         layout.setStyle("-fx-padding: 20; -fx-alignment: center; -fx-spacing: 15;-fx-font-size: 16px;");
 
-
-        Scene scene = new Scene(layout, 450, 600);
+        Scene scene = new Scene(layout, 450, 700);
         primaryStage.setScene(scene);
         primaryStage.show();
         primaryStage.setResizable(false);
@@ -229,11 +263,11 @@ public class Main extends Application {
         });
     }
 
-    public void startCracking(String zipFilePath, int numThreads, String charset, int maxPasswordLength) {
+    public void startCracking(String zipFilePath, int numThreads, String charset, int maxPasswordLength, String tryMethod) {
         updateNumThreads(Thread.activeCount() + "");
         BlockingQueue<String> passwordQueue = new LinkedBlockingQueue<>(PasswordQueue.MAX_SIZE);
 
-        PasswordQueue passwordGenerator = new PasswordQueue(charset.toCharArray(), maxPasswordLength);
+        PasswordQueue passwordGenerator = new PasswordQueue(charset.toCharArray(), maxPasswordLength, tryMethod);
         passwordGenerator.queue = passwordQueue;
         if (comboBox.getValue().equals("Thử từ đầu")) {
             passwordGenerator.index = 0;
@@ -253,6 +287,7 @@ public class Main extends Application {
             thread.start();
         }
     }
+
 
     public void stopAllThreads() {
         if (passwordGeneratorThread != null) {
@@ -333,8 +368,7 @@ public class Main extends Application {
             return;
         }
 
-
-        startCracking(filePath, numThreads, charset, maxPasswordLength);
+        startCracking(filePath, numThreads, charset, maxPasswordLength, tryMethod);
     }
 
     private void resumeCracking() {
@@ -494,6 +528,7 @@ public class Main extends Application {
             upperCase.setDisable(disabled);
             numbers.setDisable(disabled);
             specialChars.setDisable(disabled);
+
         });
     }
 
