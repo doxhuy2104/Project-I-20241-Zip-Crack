@@ -2,3 +2,7 @@ checkpass
 bruteforce
 unzip
 files
+lib/jna-5.15.0.jar
+lib/jna-platform-5.15.0.jar
+lib/jna-5.16.0.jar
+lib/lib
